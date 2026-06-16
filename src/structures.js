@@ -2,7 +2,6 @@ import { createSeededRandom, randomInt, shuffle } from "./random.js";
 import { STRUCTURE_LABELS, STRUCTURE_ORDER } from "./models.js";
 
 const MIN_SIZE = 1;
-const MAX_SIZE = 16;
 
 export { STRUCTURE_LABELS, STRUCTURE_ORDER };
 
@@ -70,7 +69,7 @@ function normalizeConfig(config, fallbackShape) {
     ...config
   };
 
-  normalized.size = clamp(toInteger(normalized.size, 7), MIN_SIZE, MAX_SIZE);
+  normalized.size = Math.max(MIN_SIZE, toInteger(normalized.size, 7));
   normalized.minValue = toInteger(normalized.minValue, 1);
   normalized.maxValue = toInteger(normalized.maxValue, 99);
   normalized.seed = String(normalized.seed || "student");
@@ -501,7 +500,7 @@ function generateGraphExample(config, random, exampleIndex) {
   const maxEdges = (nodes.length * (nodes.length - 1)) / 2;
   const targetEdges =
     config.shape === "dense"
-      ? Math.min(maxEdges, Math.max(nodes.length + 2, Math.floor(maxEdges * 0.55)))
+      ? Math.min(maxEdges, Math.max(nodes.length + 2, Math.floor(nodes.length * 2.5)))
       : config.shape === "sparse"
         ? Math.max(nodes.length - 2, Math.floor(nodes.length * 0.8))
         : Math.max(nodes.length - 1, nodes.length + 1);
@@ -579,9 +578,11 @@ function layoutLinkedList(example) {
 }
 
 function layoutGraph(example) {
-  const centerX = 320;
-  const centerY = 220;
-  const radius = Math.min(168, 58 + example.nodes.length * 12);
+  const radius = Math.min(260, 78 + example.nodes.length * 4.5);
+  const width = Math.max(640, Math.ceil(radius * 2 + 180));
+  const height = Math.max(440, Math.ceil(radius * 2 + 180));
+  const centerX = width / 2;
+  const centerY = height / 2;
   const nodes = example.nodes.map((node, index) => {
     const angle = (Math.PI * 2 * index) / example.nodes.length - Math.PI / 2;
     return {
@@ -592,8 +593,8 @@ function layoutGraph(example) {
   });
 
   return {
-    width: 640,
-    height: 440,
+    width,
+    height,
     nodes,
     edges: example.edges
   };

@@ -55,6 +55,29 @@
           </div>
         </div>
         <div id="visualizer" class="visualizer" tabindex="0"></div>
+        <div id="target-action-bar" class="target-action-bar" hidden>
+          <div class="target-copy">
+            <h2>Target action</h2>
+            <p id="target-action-detail">Select a node to choose an action.</p>
+          </div>
+          <label>
+            <span>Action</span>
+            <select id="target-action-select">
+              <option value="visit">Visit target</option>
+              <option value="remove">Remove target</option>
+              <option value="jump-trace">Jump trace</option>
+            </select>
+          </label>
+          <label>
+            <span>Label</span>
+            <input id="target-action-label" type="text" maxlength="32" placeholder="target">
+          </label>
+          <div class="target-buttons">
+            <button id="apply-target-action" class="primary" type="button">Apply</button>
+            <button id="reset-target-ops" type="button">Reset ops</button>
+            <button id="clear-target" type="button">Clear target</button>
+          </div>
+        </div>
       </section>
 
       <section class="trace-panel" aria-label="Trace controls">

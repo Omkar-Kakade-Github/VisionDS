@@ -9,6 +9,74 @@ const MAX_ZOOM = 1.8;
 const ZOOM_STEP = 0.1;
 const ALLOWED_COLORS = new Set(["#176b5d", "#b05a00", "#a9333a", "#5145a8"]);
 
+const BASE_TARGET_ACTIONS = Object.freeze([
+  { value: "visit", label: "Visit target" },
+  { value: "remove", label: "Remove target" },
+  { value: "jump-trace", label: "Jump trace" },
+  { value: "pointer", label: "Add pointer" },
+  { value: "note", label: "Add note" },
+  { value: "restore", label: "Restore target" }
+]);
+
+const TARGET_ACTIONS_BY_KIND = Object.freeze({
+  "binary-tree": [
+    { value: "visit", label: "Visit node" },
+    { value: "remove-subtree", label: "Remove subtree" },
+    { value: "make-root", label: "Mark as root" },
+    { value: "jump-trace", label: "Jump traversal" },
+    { value: "pointer", label: "Add pointer" },
+    { value: "note", label: "Add note" },
+    { value: "restore", label: "Restore subtree" }
+  ],
+  bst: [
+    { value: "visit", label: "Visit node" },
+    { value: "remove", label: "Delete target" },
+    { value: "jump-trace", label: "Trace/search target" },
+    { value: "pointer", label: "Add pointer" },
+    { value: "note", label: "Add note" },
+    { value: "restore", label: "Restore target" }
+  ],
+  "linked-list": [
+    { value: "visit", label: "Visit node" },
+    { value: "remove", label: "Remove node" },
+    { value: "pointer", label: "Set pointer" },
+    { value: "jump-trace", label: "Jump traversal" },
+    { value: "note", label: "Add note" },
+    { value: "restore", label: "Restore node" }
+  ],
+  array: [
+    { value: "visit", label: "Visit index" },
+    { value: "remove", label: "Remove item" },
+    { value: "pointer", label: "Set index pointer" },
+    { value: "jump-trace", label: "Jump scan" },
+    { value: "note", label: "Add note" },
+    { value: "restore", label: "Restore item" }
+  ],
+  stack: [
+    { value: "visit", label: "Inspect item" },
+    { value: "pop-through-target", label: "Pop to target" },
+    { value: "pointer", label: "Mark top" },
+    { value: "note", label: "Add note" },
+    { value: "restore", label: "Restore popped" }
+  ],
+  queue: [
+    { value: "visit", label: "Inspect item" },
+    { value: "dequeue-through-target", label: "Dequeue to target" },
+    { value: "pointer", label: "Mark front/rear" },
+    { value: "note", label: "Add note" },
+    { value: "restore", label: "Restore dequeued" }
+  ],
+  graph: [
+    { value: "visit", label: "Visit vertex" },
+    { value: "remove", label: "Remove vertex" },
+    { value: "start-here", label: "Start here" },
+    { value: "jump-trace", label: "Jump BFS/DFS" },
+    { value: "pointer", label: "Add pointer" },
+    { value: "note", label: "Add note" },
+    { value: "restore", label: "Restore vertex" }
+  ]
+});
+
 const elements = {
   headerDetail: document.querySelector("#header-detail"),
   themeToggle: document.querySelector("#theme-toggle"),
@@ -21,6 +89,13 @@ const elements = {
   exampleDetail: document.querySelector("#example-detail"),
   selectedTarget: document.querySelector("#selected-target"),
   visualizer: document.querySelector("#visualizer"),
+  targetActionBar: document.querySelector("#target-action-bar"),
+  targetActionDetail: document.querySelector("#target-action-detail"),
+  targetActionSelect: document.querySelector("#target-action-select"),
+  targetActionLabel: document.querySelector("#target-action-label"),
+  applyTargetAction: document.querySelector("#apply-target-action"),
+  resetTargetOps: document.querySelector("#reset-target-ops"),
+  clearTarget: document.querySelector("#clear-target"),
   zoomOut: document.querySelector("#zoom-out"),
   zoomRange: document.querySelector("#zoom-range"),
   zoomIn: document.querySelector("#zoom-in"),
@@ -79,6 +154,7 @@ function createDefaultState() {
     traceStepIndex: 0,
     canvasZoom: 1,
     theme: "light",
+    targetOperationsByExample: {},
     annotationsByExample: {}
   };
 }
@@ -98,6 +174,7 @@ function mergeState(savedState) {
       ...base.configs,
       ...(savedState.configs || {})
     },
+    targetOperationsByExample: savedState.targetOperationsByExample || {},
     annotationsByExample: savedState.annotationsByExample || {}
   };
 
@@ -185,8 +262,23 @@ function bindEvents() {
 
     state.selectedNodeId = target.dataset.nodeId;
     renderSelection();
-    renderAnnotations();
     scheduleSave();
+  });
+
+  elements.targetActionSelect.addEventListener("change", () => {
+    updateTargetActionPlaceholder();
+  });
+
+  elements.applyTargetAction.addEventListener("click", () => {
+    applyTargetAction();
+  });
+
+  elements.resetTargetOps.addEventListener("click", () => {
+    resetTargetOperations();
+  });
+
+  elements.clearTarget.addEventListener("click", () => {
+    clearSelectedTarget();
   });
 
   elements.traceSelect.addEventListener("change", () => {
@@ -289,6 +381,7 @@ function regenerateExamples() {
   state.selectedNodeId = "";
   state.selectedTraceId = "";
   state.traceStepIndex = 0;
+  state.targetOperationsByExample = {};
 }
 
 function syncSelectedExample() {
@@ -316,9 +409,8 @@ function render() {
 function renderConfigControls(config) {
   const shapes = SHAPE_OPTIONS[state.kind] || [];
   elements.configControls.innerHTML = `
-    ${numberControl("size", "Size", config.size, 1, 16)}
-    ${numberControl("minValue", "Min", config.minValue, -99, 999)}
-    ${numberControl("maxValue", "Max", config.maxValue, -99, 999)}
+    ${numberControl("size", "Size", config.size, 1)}
+    ${numberControl("minValue", "Min", config.minValue, -9999)}
     <label>
       <span>Shape</span>
       <select data-config-key="shape">
@@ -333,10 +425,11 @@ function renderConfigControls(config) {
 }
 
 function numberControl(key, label, value, min, max) {
+  const maxAttribute = max === undefined ? "" : ` max="${max}"`;
   return `
     <label>
       <span>${label}</span>
-      <input data-config-key="${key}" type="number" min="${min}" max="${max}" step="1" value="${Number(value)}">
+      <input data-config-key="${key}" type="number" min="${min}"${maxAttribute} step="1" value="${Number(value)}">
     </label>
   `;
 }
@@ -379,6 +472,9 @@ function renderSvgExample(example) {
   const scaledHeight = Math.round(layout.height * state.canvasZoom);
   const nodePositions = new Map(layout.nodes.map((node) => [node.id, node]));
   const traceStep = getCurrentTraceStep();
+  const operationState = getTargetOperationState(example.id);
+  const operationVisited = new Set(operationState.visitedNodeIds);
+  const removed = new Set(operationState.removedNodeIds);
   const annotations = getAnnotations(example.id);
   const highlightColors = new Map(
     annotations
@@ -389,7 +485,7 @@ function renderSvgExample(example) {
     ...(traceStep?.activeNodeIds || []),
     ...highlightColors.keys()
   ]);
-  const visited = new Set(traceStep?.visitedNodeIds || []);
+  const visited = new Set([...(traceStep?.visitedNodeIds || []), ...operationVisited]);
   const activeEdges = new Set(traceStep?.activeEdgeIds || []);
 
   elements.visualizer.innerHTML = `
@@ -400,13 +496,16 @@ function renderSvgExample(example) {
         </marker>
       </defs>
       <g class="edges">
-        ${layout.edges.map((edge) => renderSvgEdge(edge, nodePositions, activeEdges.has(edge.id))).join("")}
+        ${layout.edges
+          .filter((edge) => !removed.has(edge.source) && !removed.has(edge.target))
+          .map((edge) => renderSvgEdge(edge, nodePositions, activeEdges.has(edge.id))).join("")}
       </g>
       <g class="nodes">
         ${layout.nodes.map((node) => renderSvgNode(node, {
           active: highlighted.has(node.id),
           visited: visited.has(node.id),
           selected: state.selectedNodeId === node.id,
+          removed: removed.has(node.id),
           color: highlightColors.get(node.id)
         })).join("")}
       </g>
@@ -440,6 +539,7 @@ function renderSvgNode(node, flags) {
     "node",
     flags.active ? "is-active" : "",
     flags.visited ? "is-visited" : "",
+    flags.removed ? "is-removed" : "",
     flags.selected ? "is-selected" : ""
   ].filter(Boolean).join(" ");
 
@@ -449,6 +549,7 @@ function renderSvgNode(node, flags) {
     <g class="${classes}" data-node-id="${escapeHtml(node.id)}" tabindex="0" role="button" aria-label="Node ${escapeHtml(String(node.value))}">
       <circle cx="${node.x}" cy="${node.y}" r="24"${style}></circle>
       <text x="${node.x}" y="${node.y + 5}">${escapeHtml(String(node.value))}</text>
+      ${flags.removed ? `<line class="remove-mark" x1="${node.x - 18}" y1="${node.y - 18}" x2="${node.x + 18}" y2="${node.y + 18}"></line>` : ""}
     </g>
   `;
 }
@@ -497,7 +598,9 @@ function renderLinearExample(example) {
   const scaledHeight = Math.round(layout.height * state.canvasZoom);
   const traceStep = getCurrentTraceStep();
   const active = new Set(traceStep?.activeNodeIds || []);
-  const visited = new Set(traceStep?.visitedNodeIds || []);
+  const operationState = getTargetOperationState(example.id);
+  const visited = new Set([...(traceStep?.visitedNodeIds || []), ...operationState.visitedNodeIds]);
+  const removed = new Set(operationState.removedNodeIds);
   const annotations = getAnnotations(example.id);
   const highlightColors = new Map(
     annotations
@@ -518,6 +621,7 @@ function renderLinearExample(example) {
           active: active.has(node.id) || highlights.has(node.id),
           visited: visited.has(node.id),
           selected: state.selectedNodeId === node.id,
+          removed: removed.has(node.id),
           highlightColor: highlightColors.get(node.id),
           pointers: pointers.filter((pointer) => pointer.nodeId === node.id),
           notes: notes.filter((note) => note.nodeId === node.id),
@@ -533,6 +637,7 @@ function renderCell(node, flags) {
     "cell",
     flags.active ? "is-active" : "",
     flags.visited ? "is-visited" : "",
+    flags.removed ? "is-removed" : "",
     flags.selected ? "is-selected" : ""
   ].filter(Boolean).join(" ");
 
@@ -542,6 +647,7 @@ function renderCell(node, flags) {
     <button class="${classes}" type="button" data-node-id="${escapeHtml(node.id)}"${style}>
       <span class="cell-label">${node.label ? escapeHtml(node.label) : flags.index}</span>
       <strong>${escapeHtml(String(node.value))}</strong>
+      ${flags.removed ? `<span class="cell-state">removed</span>` : ""}
       <span class="cell-pointers">${flags.pointers.map((pointer) => `<em style="background:${safeColor(pointer.color, "#176b5d")}">${escapeHtml(shortLabel(pointer.label, 9))}</em>`).join("")}</span>
       ${flags.notes.map((note) => `<span class="cell-note" style="border-color:${safeColor(note.color, "#b05a00")}">${escapeHtml(shortLabel(note.label, 12))}</span>`).join("")}
     </button>
@@ -556,6 +662,8 @@ function renderSelection() {
   elements.visualizer.querySelectorAll("[data-node-id]").forEach((element) => {
     element.classList.toggle("is-selected", element.dataset.nodeId === state.selectedNodeId);
   });
+
+  renderTargetActions();
 }
 
 function syncTraceSelection() {
@@ -611,7 +719,7 @@ function renderAnnotations() {
     : `<p class="empty">No annotations.</p>`;
 }
 
-function addAnnotation(type) {
+function addAnnotation(type, labelOverride) {
   const example = getSelectedExample();
   const selectedNodeId = state.selectedNodeId;
   if (!example || !selectedNodeId) {
@@ -619,7 +727,8 @@ function addAnnotation(type) {
     return;
   }
 
-  const label = elements.annotationLabel.value.trim() || defaultAnnotationLabel(type);
+  const labelSource = labelOverride === undefined ? elements.annotationLabel.value.trim() : labelOverride;
+  const label = labelSource || defaultAnnotationLabel(type);
   const annotation = {
     id: `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     type,
@@ -630,6 +739,7 @@ function addAnnotation(type) {
 
   state.annotationsByExample[example.id] = [...getAnnotations(example.id), annotation];
   elements.annotationLabel.value = "";
+  elements.targetActionLabel.value = "";
   renderVisualizer();
   renderAnnotations();
   scheduleSave();
@@ -687,7 +797,11 @@ function getCurrentConfig() {
   if (!state.configs[state.kind]) {
     state.configs[state.kind] = registry[state.kind].getDefaultConfig();
   }
-  return { ...state.configs[state.kind] };
+  const config = { ...state.configs[state.kind] };
+  config.size = Math.max(1, toInteger(config.size, 7));
+  config.minValue = toInteger(config.minValue, 1);
+  config.maxValue = config.minValue + Math.max(99, config.size * 3);
+  return config;
 }
 
 function getSelectedExample() {
@@ -750,6 +864,260 @@ function updateZoomControls() {
   elements.zoomReset.textContent = `${percent}%`;
 }
 
+function renderTargetActions(message) {
+  const example = getSelectedExample();
+  const node = example?.nodes.find((item) => item.id === state.selectedNodeId);
+  elements.targetActionBar.hidden = !node;
+
+  if (!node) {
+    elements.targetActionDetail.textContent = "Select a node to choose an action.";
+    return;
+  }
+
+  populateTargetActions(example);
+  elements.targetActionDetail.textContent = message || `Node ${node.value} is selected.`;
+  updateTargetActionPlaceholder();
+}
+
+function applyTargetAction() {
+  const example = getSelectedExample();
+  const node = example?.nodes.find((item) => item.id === state.selectedNodeId);
+  if (!node) {
+    renderTargetActions("Select a node first.");
+    return;
+  }
+
+  const action = elements.targetActionSelect.value;
+  const label = elements.targetActionLabel.value.trim();
+
+  if (action === "jump-trace") {
+    jumpTraceToTarget(node.id);
+    return;
+  }
+
+  if (action === "pointer" || action === "note") {
+    addAnnotation(action, label);
+    renderTargetActions(`${targetActionLabel(action)} added to node ${node.value}.`);
+    return;
+  }
+
+  applyStructureOperation(example, node.id, action, label);
+}
+
+function applyStructureOperation(example, nodeId, action, label) {
+  const node = example.nodes.find((item) => item.id === nodeId);
+  const nodeLabel = node?.value ?? nodeId;
+
+  if (action === "visit") {
+    markVisited(example.id, [nodeId]);
+    renderVisualizer();
+    renderTargetActions(`Visited node ${nodeLabel}.`);
+    scheduleSave();
+    return;
+  }
+
+  if (action === "remove" || action === "remove-subtree") {
+    const targetIds = action === "remove-subtree" ? getSubtreeNodeIds(example, nodeId) : [nodeId];
+    markRemoved(example.id, targetIds);
+    renderVisualizer();
+    renderTargetActions(action === "remove-subtree" ? `Removed ${targetIds.length} subtree node(s).` : `Removed node ${nodeLabel}.`);
+    scheduleSave();
+    return;
+  }
+
+  if (action === "pop-through-target") {
+    const targetIds = getStackPopNodeIds(example, nodeId);
+    markRemoved(example.id, targetIds);
+    renderVisualizer();
+    renderTargetActions(`Popped ${targetIds.length} stack item(s).`);
+    scheduleSave();
+    return;
+  }
+
+  if (action === "dequeue-through-target") {
+    const targetIds = getQueueDequeueNodeIds(example, nodeId);
+    markRemoved(example.id, targetIds);
+    renderVisualizer();
+    renderTargetActions(`Dequeued ${targetIds.length} queue item(s).`);
+    scheduleSave();
+    return;
+  }
+
+  if (action === "make-root" || action === "start-here") {
+    addAnnotation("pointer", label || (action === "make-root" ? "root" : "start"));
+    renderTargetActions(action === "make-root" ? `Marked ${nodeLabel} as root.` : `Marked ${nodeLabel} as start.`);
+    return;
+  }
+
+  if (action === "restore") {
+    restoreTargets(example.id, getRestoreNodeIds(example, nodeId));
+    renderVisualizer();
+    renderTargetActions(`Restored node ${nodeLabel}.`);
+    scheduleSave();
+  }
+}
+
+function jumpTraceToTarget(nodeId) {
+  const program = getCurrentTraceProgram();
+  if (!program) {
+    renderTargetActions("No trace is available for this example.");
+    return;
+  }
+
+  const stepIndex = program.steps.findIndex((step) => (
+    step.activeNodeIds.includes(nodeId)
+      || step.visitedNodeIds.includes(nodeId)
+      || step.pointers.some((pointer) => pointer.nodeId === nodeId)
+  ));
+
+  if (stepIndex === -1) {
+    renderTargetActions("The current trace does not touch this target.");
+    return;
+  }
+
+  stopTrace({ render: false });
+  state.traceStepIndex = stepIndex;
+  renderVisualizer();
+  renderTrace();
+  renderTargetActions(`Trace moved to step ${stepIndex + 1}.`);
+  scheduleSave();
+}
+
+function clearSelectedTarget() {
+  state.selectedNodeId = "";
+  renderSelection();
+  scheduleSave();
+}
+
+function resetTargetOperations() {
+  const example = getSelectedExample();
+  if (!example) {
+    return;
+  }
+
+  state.targetOperationsByExample[example.id] = createEmptyOperationState();
+  renderVisualizer();
+  renderTargetActions("Target operations reset for this example.");
+  scheduleSave();
+}
+
+function updateTargetActionPlaceholder() {
+  const placeholders = {
+    visit: "optional label",
+    remove: "optional label",
+    "remove-subtree": "optional label",
+    "pop-through-target": "optional label",
+    "dequeue-through-target": "optional label",
+    "make-root": "root",
+    "start-here": "start",
+    pointer: "ptr",
+    note: "note",
+    "jump-trace": "label optional",
+    restore: "label optional"
+  };
+  elements.targetActionLabel.placeholder = placeholders[elements.targetActionSelect.value] || "target";
+  elements.targetActionLabel.disabled = !["pointer", "note", "make-root", "start-here"].includes(elements.targetActionSelect.value);
+}
+
+function targetActionLabel(action) {
+  if (action === "pointer") {
+    return "Pointer";
+  }
+  if (action === "note") {
+    return "Note";
+  }
+  return "Highlight";
+}
+
+function populateTargetActions(example) {
+  const actions = TARGET_ACTIONS_BY_KIND[example.kind] || BASE_TARGET_ACTIONS;
+  const currentValue = elements.targetActionSelect.value;
+  elements.targetActionSelect.innerHTML = actions
+    .map((action) => `<option value="${escapeHtml(action.value)}">${escapeHtml(action.label)}</option>`)
+    .join("");
+
+  elements.targetActionSelect.value = actions.some((action) => action.value === currentValue)
+    ? currentValue
+    : actions[0]?.value || "visit";
+}
+
+function getTargetOperationState(exampleId) {
+  const stateForExample = state.targetOperationsByExample[exampleId] || createEmptyOperationState();
+  return {
+    visitedNodeIds: Array.isArray(stateForExample.visitedNodeIds) ? stateForExample.visitedNodeIds : [],
+    removedNodeIds: Array.isArray(stateForExample.removedNodeIds) ? stateForExample.removedNodeIds : []
+  };
+}
+
+function setTargetOperationState(exampleId, nextState) {
+  state.targetOperationsByExample[exampleId] = {
+    visitedNodeIds: [...new Set(nextState.visitedNodeIds)],
+    removedNodeIds: [...new Set(nextState.removedNodeIds)]
+  };
+}
+
+function createEmptyOperationState() {
+  return { visitedNodeIds: [], removedNodeIds: [] };
+}
+
+function markVisited(exampleId, nodeIds) {
+  const operationState = getTargetOperationState(exampleId);
+  setTargetOperationState(exampleId, {
+    ...operationState,
+    visitedNodeIds: [...operationState.visitedNodeIds, ...nodeIds]
+  });
+}
+
+function markRemoved(exampleId, nodeIds) {
+  const operationState = getTargetOperationState(exampleId);
+  const removedIds = new Set([...operationState.removedNodeIds, ...nodeIds]);
+  setTargetOperationState(exampleId, {
+    visitedNodeIds: operationState.visitedNodeIds.filter((nodeId) => !removedIds.has(nodeId)),
+    removedNodeIds: [...removedIds]
+  });
+}
+
+function restoreTargets(exampleId, nodeIds) {
+  const restoreIds = new Set(nodeIds);
+  const operationState = getTargetOperationState(exampleId);
+  setTargetOperationState(exampleId, {
+    visitedNodeIds: operationState.visitedNodeIds.filter((nodeId) => !restoreIds.has(nodeId)),
+    removedNodeIds: operationState.removedNodeIds.filter((nodeId) => !restoreIds.has(nodeId))
+  });
+}
+
+function getSubtreeNodeIds(example, rootNodeId) {
+  const childrenBySource = new Map();
+  for (const edge of example.edges) {
+    const children = childrenBySource.get(edge.source) || [];
+    children.push(edge.target);
+    childrenBySource.set(edge.source, children);
+  }
+
+  const result = [];
+  const stack = [rootNodeId];
+  while (stack.length) {
+    const nodeId = stack.pop();
+    result.push(nodeId);
+    stack.push(...(childrenBySource.get(nodeId) || []));
+  }
+  return result;
+}
+
+function getStackPopNodeIds(example, targetNodeId) {
+  const targetIndex = example.nodes.findIndex((node) => node.id === targetNodeId);
+  return targetIndex === -1 ? [targetNodeId] : example.nodes.slice(targetIndex).map((node) => node.id);
+}
+
+function getQueueDequeueNodeIds(example, targetNodeId) {
+  const targetIndex = example.nodes.findIndex((node) => node.id === targetNodeId);
+  return targetIndex === -1 ? [targetNodeId] : example.nodes.slice(0, targetIndex + 1).map((node) => node.id);
+}
+
+function getRestoreNodeIds(example, targetNodeId) {
+  return example.kind === "binary-tree" ? getSubtreeNodeIds(example, targetNodeId) : [targetNodeId];
+}
+
 function applyTheme() {
   document.body.dataset.theme = state.theme;
   elements.themeToggle.textContent = state.theme === "dark" ? "Light" : "Dark";
@@ -769,6 +1137,11 @@ function clampNumber(value, min, max) {
   const parsed = Number.parseInt(String(value), 10);
   const number = Number.isFinite(parsed) ? parsed : min;
   return Math.min(max, Math.max(min, number));
+}
+
+function toInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function escapeHtml(value) {

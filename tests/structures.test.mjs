@@ -43,6 +43,15 @@ test("each generator returns valid examples", () => {
   }
 });
 
+test("generators allow sizes above previous UI caps", () => {
+  for (const kind of STRUCTURE_ORDER) {
+    const entry = registry[kind];
+    const largerConfig = { ...entry.getDefaultConfig(), seed: "larger", size: 64, minValue: 1, maxValue: 300 };
+
+    assert.equal(entry.generateExamples(largerConfig, 1)[0].nodes.length, 64, `${kind}: larger example`);
+  }
+});
+
 test("layouts include every generated node", () => {
   for (const kind of STRUCTURE_ORDER) {
     const entry = registry[kind];
