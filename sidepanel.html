@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>StructSketch</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <div>
+          <h1>StructSketch</h1>
+          <p id="header-detail">Binary tree</p>
+        </div>
+        <button id="generate" class="primary" type="button">Generate</button>
+      </header>
+
+      <section class="controls" aria-label="Generator controls">
+        <label>
+          <span>Structure</span>
+          <select id="structure-select"></select>
+        </label>
+        <div id="config-controls" class="config-grid"></div>
+      </section>
+
+      <section class="examples" aria-label="Generated examples">
+        <div class="section-head">
+          <h2>Examples</h2>
+          <label class="count-control">
+            <span>Count</span>
+            <input id="example-count" type="number" min="1" max="8" step="1">
+          </label>
+        </div>
+        <div id="example-list" class="example-list"></div>
+      </section>
+
+      <section class="workspace" aria-label="Visualizer">
+        <div class="visual-head">
+          <div>
+            <h2 id="example-title">Example</h2>
+            <p id="example-detail"></p>
+          </div>
+          <p id="selected-target" class="target-pill">No target</p>
+        </div>
+        <div id="visualizer" class="visualizer" tabindex="0"></div>
+      </section>
+
+      <section class="trace-panel" aria-label="Trace controls">
+        <div class="trace-top">
+          <label>
+            <span>Trace</span>
+            <select id="trace-select"></select>
+          </label>
+          <div class="trace-buttons">
+            <button id="trace-reset" type="button" title="Reset trace">Reset</button>
+            <button id="trace-prev" type="button" title="Previous step">Prev</button>
+            <button id="trace-play" type="button" title="Play trace">Play</button>
+            <button id="trace-next" type="button" title="Next step">Next</button>
+          </div>
+        </div>
+        <div class="step-meter">
+          <progress id="trace-progress" max="1" value="0"></progress>
+          <span id="trace-count">0 / 0</span>
+        </div>
+        <div id="trace-step" class="trace-step"></div>
+      </section>
+
+      <section class="annotations" aria-label="Annotations">
+        <div class="section-head">
+          <h2>Annotations</h2>
+          <button id="clear-annotations" type="button">Clear</button>
+        </div>
+        <div class="annotation-controls">
+          <label>
+            <span>Label</span>
+            <input id="annotation-label" type="text" maxlength="32" placeholder="current">
+          </label>
+          <label>
+            <span>Color</span>
+            <select id="annotation-color">
+              <option value="#176b5d">Teal</option>
+              <option value="#b05a00">Amber</option>
+              <option value="#a9333a">Red</option>
+              <option value="#5145a8">Indigo</option>
+            </select>
+          </label>
+          <div class="annotation-buttons">
+            <button id="add-pointer" type="button">Pointer</button>
+            <button id="add-highlight" type="button">Highlight</button>
+            <button id="add-note" type="button">Note</button>
+          </div>
+        </div>
+        <div id="annotation-list" class="annotation-list"></div>
+      </section>
+    </main>
+    <script type="module" src="src/sidepanel.js"></script>
+  </body>
+</html>

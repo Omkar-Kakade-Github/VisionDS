@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "StructSketch",
+  "version": "0.1.0",
+  "description": "Generate and trace data structure examples in a Chrome side panel.",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel", "storage"],
+  "action": {
+    "default_title": "Open StructSketch",
+    "default_popup": "popup.html"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}
