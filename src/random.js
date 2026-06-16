@@ -1,5 +1,5 @@
 export function createSeededRandom(seedInput) {
-  let state = hashString(String(seedInput || "struct-sketch"));
+  let state = hashString(String(seedInput || "vision-ds"));
 
   return {
     next() {

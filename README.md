@@ -1,13 +1,13 @@
-# StructSketch
+# VisionDS
 
-StructSketch is a Manifest V3 Chrome extension for generating, visualizing, and tracing data structure examples in a side panel.
+VisionDS is a Manifest V3 Chrome extension for generating, visualizing, and tracing data structure examples in a side panel.
 
 ## Load The Extension
 
 1. Open `chrome://extensions`.
 2. Enable Developer mode.
 3. Choose **Load unpacked**.
-4. Select this folder: `/home/blaze/Blaze/Projects/struct_gen`.
+4. Select this folder: `/home/blaze/Blaze/Projects/VisionDS`.
 5. Click the extension action and choose **Open Side Panel**.
 
 ## Supported Structures

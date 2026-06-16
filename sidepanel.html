@@ -3,17 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>StructSketch</title>
+    <title>VisionDS</title>
     <link rel="stylesheet" href="sidepanel.css">
   </head>
   <body>
     <main class="app">
       <header class="app-header">
         <div>
-          <h1>StructSketch</h1>
+          <h1>VisionDS</h1>
           <p id="header-detail">Binary tree</p>
         </div>
-        <button id="generate" class="primary" type="button">Generate</button>
+        <div class="header-actions">
+          <button id="theme-toggle" class="utility" type="button" title="Toggle dark mode">Dark</button>
+          <button id="generate" class="primary" type="button">Generate</button>
+        </div>
       </header>
 
       <section class="controls" aria-label="Generator controls">
@@ -41,7 +44,15 @@
             <h2 id="example-title">Example</h2>
             <p id="example-detail"></p>
           </div>
-          <p id="selected-target" class="target-pill">No target</p>
+          <div class="visual-tools">
+            <p id="selected-target" class="target-pill">No target</p>
+            <div class="zoom-control" aria-label="Canvas zoom">
+              <button id="zoom-out" type="button" title="Zoom out">-</button>
+              <input id="zoom-range" type="range" min="50" max="180" step="10" value="100" aria-label="Canvas zoom">
+              <button id="zoom-in" type="button" title="Zoom in">+</button>
+              <button id="zoom-reset" type="button" title="Reset zoom">100%</button>
+            </div>
+          </div>
         </div>
         <div id="visualizer" class="visualizer" tabindex="0"></div>
       </section>

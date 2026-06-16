@@ -1,12 +1,17 @@
 import { registry, SHAPE_OPTIONS, STRUCTURE_LABELS, STRUCTURE_ORDER } from "./structures.js";
 
-const STORAGE_KEY = "structSketchState";
+const STORAGE_KEY = "visionDsState";
+const LEGACY_STORAGE_KEY = "structSketchState";
 const SVG_KINDS = new Set(["binary-tree", "bst", "linked-list", "graph"]);
 const PLAY_INTERVAL_MS = 850;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 1.8;
+const ZOOM_STEP = 0.1;
 const ALLOWED_COLORS = new Set(["#176b5d", "#b05a00", "#a9333a", "#5145a8"]);
 
 const elements = {
   headerDetail: document.querySelector("#header-detail"),
+  themeToggle: document.querySelector("#theme-toggle"),
   structureSelect: document.querySelector("#structure-select"),
   configControls: document.querySelector("#config-controls"),
   generate: document.querySelector("#generate"),
@@ -16,6 +21,10 @@ const elements = {
   exampleDetail: document.querySelector("#example-detail"),
   selectedTarget: document.querySelector("#selected-target"),
   visualizer: document.querySelector("#visualizer"),
+  zoomOut: document.querySelector("#zoom-out"),
+  zoomRange: document.querySelector("#zoom-range"),
+  zoomIn: document.querySelector("#zoom-in"),
+  zoomReset: document.querySelector("#zoom-reset"),
   traceSelect: document.querySelector("#trace-select"),
   traceReset: document.querySelector("#trace-reset"),
   tracePrev: document.querySelector("#trace-prev"),
@@ -68,6 +77,8 @@ function createDefaultState() {
     selectedNodeId: "",
     selectedTraceId: "",
     traceStepIndex: 0,
+    canvasZoom: 1,
+    theme: "light",
     annotationsByExample: {}
   };
 }
@@ -95,6 +106,8 @@ function mergeState(savedState) {
   }
 
   merged.exampleCount = clampNumber(merged.exampleCount, 1, 8);
+  merged.canvasZoom = normalizeZoom(merged.canvasZoom);
+  merged.theme = merged.theme === "dark" ? "dark" : "light";
   return merged;
 }
 
@@ -106,7 +119,7 @@ function populateStructureSelect() {
 
 function bindEvents() {
   elements.structureSelect.addEventListener("change", () => {
-    stopTrace();
+    stopTrace({ render: false });
     state.kind = elements.structureSelect.value;
     if (!state.configs[state.kind]) {
       state.configs[state.kind] = registry[state.kind].getDefaultConfig();
@@ -120,7 +133,7 @@ function bindEvents() {
   });
 
   elements.generate.addEventListener("click", () => {
-    stopTrace();
+    stopTrace({ render: false });
     regenerateExamples();
     render();
     scheduleSave();
@@ -154,7 +167,7 @@ function bindEvents() {
       return;
     }
 
-    stopTrace();
+    stopTrace({ render: false });
     state.selectedExampleId = button.dataset.exampleId;
     state.selectedNodeId = "";
     state.selectedTraceId = "";
@@ -177,8 +190,9 @@ function bindEvents() {
   });
 
   elements.traceSelect.addEventListener("change", () => {
-    stopTrace();
-    state.selectedTraceId = elements.traceSelect.value;
+    const nextTraceId = elements.traceSelect.value;
+    stopTrace({ render: false });
+    state.selectedTraceId = nextTraceId;
     state.traceStepIndex = 0;
     renderVisualizer();
     renderTrace();
@@ -186,7 +200,7 @@ function bindEvents() {
   });
 
   elements.traceReset.addEventListener("click", () => {
-    stopTrace();
+    stopTrace({ render: false });
     state.traceStepIndex = 0;
     renderVisualizer();
     renderTrace();
@@ -194,7 +208,7 @@ function bindEvents() {
   });
 
   elements.tracePrev.addEventListener("click", () => {
-    stopTrace();
+    stopTrace({ render: false });
     state.traceStepIndex = Math.max(0, state.traceStepIndex - 1);
     renderVisualizer();
     renderTrace();
@@ -202,9 +216,31 @@ function bindEvents() {
   });
 
   elements.traceNext.addEventListener("click", () => {
-    stopTrace();
+    stopTrace({ render: false });
     advanceTrace();
     scheduleSave();
+  });
+
+  elements.themeToggle.addEventListener("click", () => {
+    state.theme = state.theme === "dark" ? "light" : "dark";
+    applyTheme();
+    scheduleSave();
+  });
+
+  elements.zoomRange.addEventListener("input", () => {
+    setCanvasZoom(Number(elements.zoomRange.value) / 100);
+  });
+
+  elements.zoomOut.addEventListener("click", () => {
+    setCanvasZoom(state.canvasZoom - ZOOM_STEP);
+  });
+
+  elements.zoomIn.addEventListener("click", () => {
+    setCanvasZoom(state.canvasZoom + ZOOM_STEP);
+  });
+
+  elements.zoomReset.addEventListener("click", () => {
+    setCanvasZoom(1);
   });
 
   elements.tracePlay.addEventListener("click", () => {
@@ -263,12 +299,14 @@ function syncSelectedExample() {
 
 function render() {
   const config = getCurrentConfig();
+  applyTheme();
   elements.structureSelect.value = state.kind;
   elements.headerDetail.textContent = STRUCTURE_LABELS[state.kind];
   elements.exampleCount.value = String(state.exampleCount);
 
   renderConfigControls(config);
   renderExamples();
+  updateZoomControls();
   syncTraceSelection();
   renderVisualizer();
   renderTrace();
@@ -337,6 +375,8 @@ function renderVisualizer() {
 
 function renderSvgExample(example) {
   const layout = registry[example.kind].layout(example);
+  const scaledWidth = Math.round(layout.width * state.canvasZoom);
+  const scaledHeight = Math.round(layout.height * state.canvasZoom);
   const nodePositions = new Map(layout.nodes.map((node) => [node.id, node]));
   const traceStep = getCurrentTraceStep();
   const annotations = getAnnotations(example.id);
@@ -353,7 +393,7 @@ function renderSvgExample(example) {
   const activeEdges = new Set(traceStep?.activeEdgeIds || []);
 
   elements.visualizer.innerHTML = `
-    <svg class="structure-svg" viewBox="0 0 ${layout.width} ${layout.height}" role="img" aria-label="${escapeHtml(example.title)}">
+    <svg class="structure-svg" width="${scaledWidth}" height="${scaledHeight}" viewBox="0 0 ${layout.width} ${layout.height}" role="img" aria-label="${escapeHtml(example.title)}">
       <defs>
         <marker id="arrow-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z"></path>
@@ -452,6 +492,9 @@ function renderSvgNotes(nodes, notes) {
 }
 
 function renderLinearExample(example) {
+  const layout = registry[example.kind].layout(example);
+  const scaledWidth = Math.round(layout.width * state.canvasZoom);
+  const scaledHeight = Math.round(layout.height * state.canvasZoom);
   const traceStep = getCurrentTraceStep();
   const active = new Set(traceStep?.activeNodeIds || []);
   const visited = new Set(traceStep?.visitedNodeIds || []);
@@ -469,16 +512,18 @@ function renderLinearExample(example) {
   const orderedNodes = example.kind === "stack" ? [...example.nodes].reverse() : example.nodes;
 
   elements.visualizer.innerHTML = `
-    <div class="${className}">
-      ${orderedNodes.map((node, visualIndex) => renderCell(node, {
-        active: active.has(node.id) || highlights.has(node.id),
-        visited: visited.has(node.id),
-        selected: state.selectedNodeId === node.id,
-        highlightColor: highlightColors.get(node.id),
-        pointers: pointers.filter((pointer) => pointer.nodeId === node.id),
-        notes: notes.filter((note) => note.nodeId === node.id),
-        index: example.kind === "stack" ? example.nodes.length - visualIndex - 1 : visualIndex
-      })).join("")}
+    <div class="linear-frame" style="width:${scaledWidth}px;height:${scaledHeight}px">
+      <div class="${className}" style="width:${layout.width}px;min-height:${layout.height}px;transform:scale(${state.canvasZoom})">
+        ${orderedNodes.map((node, visualIndex) => renderCell(node, {
+          active: active.has(node.id) || highlights.has(node.id),
+          visited: visited.has(node.id),
+          selected: state.selectedNodeId === node.id,
+          highlightColor: highlightColors.get(node.id),
+          pointers: pointers.filter((pointer) => pointer.nodeId === node.id),
+          notes: notes.filter((note) => note.nodeId === node.id),
+          index: example.kind === "stack" ? example.nodes.length - visualIndex - 1 : visualIndex
+        })).join("")}
+      </div>
     </div>
   `;
 }
@@ -617,12 +662,14 @@ function startTrace() {
   renderTrace();
 }
 
-function stopTrace() {
+function stopTrace({ render = true } = {}) {
   if (playTimer) {
     window.clearInterval(playTimer);
     playTimer = 0;
   }
-  renderTrace();
+  if (render) {
+    renderTrace();
+  }
 }
 
 function advanceTrace() {
@@ -684,8 +731,38 @@ async function loadState() {
     return null;
   }
 
-  const result = await extensionApi.storage.local.get(STORAGE_KEY);
-  return result[STORAGE_KEY] || null;
+  const result = await extensionApi.storage.local.get([STORAGE_KEY, LEGACY_STORAGE_KEY]);
+  return result[STORAGE_KEY] || result[LEGACY_STORAGE_KEY] || null;
+}
+
+function setCanvasZoom(value) {
+  state.canvasZoom = normalizeZoom(value);
+  updateZoomControls();
+  renderVisualizer();
+  scheduleSave();
+}
+
+function updateZoomControls() {
+  const percent = Math.round(state.canvasZoom * 100);
+  elements.zoomRange.value = String(percent);
+  elements.zoomOut.disabled = state.canvasZoom <= MIN_ZOOM;
+  elements.zoomIn.disabled = state.canvasZoom >= MAX_ZOOM;
+  elements.zoomReset.textContent = `${percent}%`;
+}
+
+function applyTheme() {
+  document.body.dataset.theme = state.theme;
+  elements.themeToggle.textContent = state.theme === "dark" ? "Light" : "Dark";
+  elements.themeToggle.title = state.theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+}
+
+function normalizeZoom(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 1;
+  }
+  const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, number));
+  return Math.round(clamped * 10) / 10;
 }
 
 function clampNumber(value, min, max) {
