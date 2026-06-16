@@ -13,8 +13,6 @@
   --accent: #176b5d;
   --accent-weak: #dff0eb;
   --amber: #b05a00;
-  --red: #a9333a;
-  --indigo: #5145a8;
   --visited: #ece8dc;
   --edge: #918b80;
   --scrollbar-track: #ebe7dc;
@@ -37,8 +35,6 @@ body[data-theme="dark"] {
   --accent: #54b99f;
   --accent-weak: #153d35;
   --amber: #d59045;
-  --red: #e07178;
-  --indigo: #a9a0ff;
   --visited: #343229;
   --edge: #a9a194;
   --scrollbar-track: #24251f;
@@ -104,8 +100,7 @@ button:disabled {
 .controls,
 .examples,
 .workspace,
-.trace-panel,
-.annotations {
+.trace-panel {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -176,8 +171,7 @@ h2 {
 
 .controls,
 .examples,
-.trace-panel,
-.annotations {
+.trace-panel {
   padding: 10px;
 }
 
@@ -255,13 +249,11 @@ button:focus-visible,
   text-align: left;
 }
 
-.example-chip strong,
-.annotation-item strong {
+.example-chip strong {
   font-size: 13px;
 }
 
-.example-chip span,
-.annotation-item span {
+.example-chip span {
   color: var(--muted);
   font-size: 12px;
 }
@@ -294,19 +286,6 @@ button:focus-visible,
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-}
-
-.target-pill {
-  max-width: 126px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 8px;
-  color: var(--muted);
-  background: var(--panel-soft);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .zoom-control {
@@ -358,33 +337,6 @@ button:focus-visible,
   background: var(--scrollbar-thumb);
 }
 
-.target-action-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(116px, 0.6fr) minmax(124px, 0.6fr) auto;
-  align-items: end;
-  gap: 8px;
-  border-top: 1px solid var(--border);
-  padding: 10px;
-  background: var(--panel-soft);
-}
-
-.target-copy {
-  min-width: 0;
-}
-
-.target-copy p {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.target-buttons {
-  display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(74px, auto) minmax(92px, auto);
-  gap: 6px;
-}
-
 .structure-svg {
   display: block;
   max-width: none;
@@ -411,10 +363,6 @@ marker path {
   fill: var(--edge);
 }
 
-.node {
-  cursor: pointer;
-}
-
 .node circle {
   fill: var(--control);
   stroke: var(--border-strong);
@@ -438,52 +386,15 @@ marker path {
   stroke-width: 4;
 }
 
-.node.is-removed {
-  opacity: 0.48;
-}
-
-.node.is-removed circle {
-  fill: var(--panel-soft);
-  stroke: var(--red);
-  stroke-dasharray: 5 4;
-}
-
-.remove-mark {
-  stroke: var(--red);
-  stroke-width: 4;
-  stroke-linecap: round;
-}
-
-.node.is-selected circle,
-.cell.is-selected {
-  stroke: var(--indigo);
-  border-color: var(--indigo);
-  box-shadow: 0 0 0 3px rgba(81, 69, 168, 0.18);
-}
-
 .badge rect {
   fill: var(--accent);
 }
 
-.badge.annotation rect {
-  fill: var(--indigo);
-}
-
-.badge text,
-.note-badge text {
+.badge text {
   fill: #ffffff;
   font-size: 11px;
   font-weight: 780;
   text-anchor: middle;
-}
-
-.note-badge rect {
-  fill: var(--panel);
-  stroke-width: 2;
-}
-
-.note-badge text {
-  fill: var(--ink);
 }
 
 .linear-frame {
@@ -552,22 +463,6 @@ marker path {
   font-weight: 780;
 }
 
-.cell-note {
-  position: absolute;
-  right: -8px;
-  bottom: -18px;
-  max-width: 92px;
-  overflow: hidden;
-  border: 2px solid var(--amber);
-  border-radius: 7px;
-  padding: 2px 5px;
-  color: var(--ink);
-  background: var(--panel);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .cell.is-visited {
   background: var(--visited);
 }
@@ -575,22 +470,6 @@ marker path {
 .cell.is-active {
   border-color: var(--accent);
   background: var(--accent-weak);
-}
-
-.cell.is-removed {
-  border-color: var(--red);
-  border-style: dashed;
-  opacity: 0.58;
-}
-
-.cell.is-removed strong {
-  text-decoration: line-through;
-}
-
-.cell-state {
-  color: var(--red);
-  font-size: 10px;
-  font-weight: 760;
 }
 
 .trace-panel {
@@ -614,10 +493,7 @@ marker path {
 }
 
 .trace-buttons button,
-.section-head button,
-.annotation-buttons button,
-.annotation-item button,
-.target-buttons button {
+.section-head button {
   min-height: 32px;
   padding: 0 9px;
   font-size: 12px;
@@ -666,43 +542,6 @@ progress::-webkit-progress-value {
   line-height: 1.4;
 }
 
-.annotation-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
-  gap: 8px;
-  margin-top: 9px;
-}
-
-.annotation-buttons {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.annotation-list {
-  display: grid;
-  gap: 6px;
-  margin-top: 9px;
-}
-
-.annotation-item {
-  display: grid;
-  grid-template-columns: 12px auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 6px;
-  background: var(--panel-soft);
-}
-
-.color-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
 @media (min-width: 700px) {
   .app {
     grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
@@ -726,7 +565,6 @@ progress::-webkit-progress-value {
   .app-header > div:first-child,
   .header-actions,
   .visual-tools,
-  .target-action-bar,
   .trace-top label,
   .trace-buttons {
     width: 100%;
@@ -737,8 +575,7 @@ progress::-webkit-progress-value {
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   }
 
-  .config-grid,
-  .annotation-controls {
+  .config-grid {
     grid-template-columns: 1fr;
   }
 
@@ -747,23 +584,4 @@ progress::-webkit-progress-value {
     grid-template-columns: 32px minmax(0, 1fr) 32px 56px;
   }
 
-  .target-pill {
-    max-width: 100%;
-  }
-
-  .target-action-bar {
-    grid-template-columns: 1fr;
-  }
-
-  .target-buttons {
-    grid-template-columns: 1fr;
-  }
-
-  .annotation-item {
-    grid-template-columns: 12px auto minmax(0, 1fr);
-  }
-
-  .annotation-item button {
-    grid-column: 1 / -1;
-  }
 }
